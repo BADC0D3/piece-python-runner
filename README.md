@@ -207,6 +207,7 @@ On error:
 - CPU limited to 50% of one core
 - Network access can be restricted
 - Complete isolation from host system
+- Runs as non-root user for enhanced security
 
 ## Best Practices
 

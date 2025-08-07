@@ -66,46 +66,41 @@ export const runPythonCodeSandboxed = createAction({
         // If requirements are specified, install them silently first then run the code
         const requirementsList = requirements.trim().split('\n').filter((r: string) => r.trim()).join(' ');
         
-        // Create a Python script that handles requirements installation and code execution
-        const wrapperScript = `
-import subprocess
-import sys
-import os
+        // Create a script that sets up a non-root user and runs the code
+        const setupScript = `
+# Create a non-root user
+adduser -D -h /home/pyuser pyuser 2>/dev/null || true
+mkdir -p /home/pyuser
+chown -R pyuser:pyuser /home/pyuser
 
-# Suppress pip output by redirecting to devnull
-with open(os.devnull, 'w') as devnull:
-    old_stdout = sys.stdout
-    old_stderr = sys.stderr
-    sys.stdout = devnull
-    sys.stderr = devnull
-    
-    try:
-        # Install requirements silently
-        subprocess.check_call([sys.executable, '-m', 'pip', 'install', '--quiet', '--no-cache-dir'] + '''${requirementsList}'''.split())
-    except subprocess.CalledProcessError as e:
-        sys.stdout = old_stdout
-        sys.stderr = old_stderr
-        print(f"Error installing packages: {e}", file=sys.stderr)
-        sys.exit(1)
-    finally:
-        # Restore stdout/stderr
-        sys.stdout = old_stdout
-        sys.stderr = old_stderr
-
-# Now execute the actual code
-exec('''${code.replace(/'/g, "\\'")}''')
+# Switch to non-root user and run the Python code
+su - pyuser -c "
+cd /home/pyuser
+python3 -m pip install --user --quiet --no-cache-dir ${requirementsList} 2>/dev/null
+python3 -c '${code.replace(/'/g, "\\'").replace(/\$/g, "\\$")}'
+"
 `;
         
-        cmd = ['python', '-c', wrapperScript];
+        cmd = ['sh', '-c', setupScript];
       } else {
-        // No requirements, just run the code
-        cmd = ['python', '-c', code];
+        // No requirements, create user and run the code
+        const setupScript = `
+# Create a non-root user
+adduser -D -h /home/pyuser pyuser 2>/dev/null || true
+mkdir -p /home/pyuser
+chown -R pyuser:pyuser /home/pyuser
+
+# Switch to non-root user and run the Python code
+su - pyuser -c "python3 -c '${code.replace(/'/g, "\\'").replace(/\$/g, "\\$")}'"
+`;
+        
+        cmd = ['sh', '-c', setupScript];
       }
       
       const container = await docker.createContainer({
         Image: imageName,
         Cmd: cmd,
-        WorkingDir: '/app',
+        WorkingDir: '/home/pyuser',
         HostConfig: {
           AutoRemove: true,
           Memory: 512 * 1024 * 1024, // 512MB
