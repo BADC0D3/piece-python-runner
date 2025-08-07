@@ -63,8 +63,12 @@ print(json.dumps(data, indent=2))
     // Create a temporary directory for this execution
     const tempDir = join('/tmp', `python-exec-${randomBytes(8).toString('hex')}`);
     const scriptPath = join(tempDir, 'script.py');
-    const requirementsPath = join(tempDir, 'requirements.txt');
     const venvPath = join(tempDir, 'venv');
+    const requirementsPath = join(tempDir, 'requirements.txt');
+    
+    let useVenv = true;
+    let pipCommand = '';
+    let pythonCommand = '';
     
     try {
       // Create temporary directory
@@ -75,44 +79,77 @@ print(json.dumps(data, indent=2))
       
       // Create virtual environment
       try {
+        // First check if Python is available and get version info
+        const pythonCheck = await execAsync(`${pythonVersion} --version`, {
+          timeout: 5000,
+        });
+        console.log(`Python version check: ${pythonCheck.stdout}`);
+        
+        // Check if venv module is available
+        const venvCheck = await execAsync(`${pythonVersion} -m venv --help`, {
+          timeout: 5000,
+        }).catch(err => {
+          throw new Error(`Python venv module not available. Please ensure python3-venv is installed. Error: ${err.message}`);
+        });
+        
         // Try creating venv with symlinks first
         await execAsync(`${pythonVersion} -m venv ${venvPath}`, {
           timeout: 10000,
         });
       } catch (error: any) {
+        console.log('Primary venv creation failed:', error.message);
+        
         // If symlink fails, try without symlinks
-        console.log('Venv creation with symlinks failed, trying with copies...');
-        await execAsync(`${pythonVersion} -m venv --copies ${venvPath}`, {
-          timeout: 10000,
-        });
+        try {
+          console.log('Trying venv creation with --copies flag...');
+          await execAsync(`${pythonVersion} -m venv --copies ${venvPath}`, {
+            timeout: 10000,
+          });
+        } catch (fallbackError: any) {
+          // If both methods fail, try using the system Python directly
+          console.log('Venv creation failed. Error details:', fallbackError.message);
+          console.log('Falling back to system Python without virtual environment...');
+          useVenv = false;
+        }
       }
       
-      // Determine pip path based on OS
-      const pipPath = process.platform === 'win32' 
-        ? join(venvPath, 'Scripts', 'pip')
-        : join(venvPath, 'bin', 'pip');
-      
-      const pythonPath = process.platform === 'win32'
-        ? join(venvPath, 'Scripts', 'python')
-        : join(venvPath, 'bin', 'python');
+      if (useVenv) {
+        // Determine pip path based on OS
+        const pipPath = process.platform === 'win32' 
+          ? join(venvPath, 'Scripts', 'pip')
+          : join(venvPath, 'bin', 'pip');
+        
+        const pythonPath = process.platform === 'win32' 
+          ? join(venvPath, 'Scripts', 'python')
+          : join(venvPath, 'bin', 'python');
+          
+        pipCommand = pipPath;
+        pythonCommand = pythonPath;
+      } else {
+        // Use system Python and pip
+        pipCommand = `${pythonVersion} -m pip`;
+        pythonCommand = pythonVersion;
+      }
       
       // Install requirements if provided
       if (requirements && requirements.trim()) {
         writeFileSync(requirementsPath, requirements);
         
-        try {
-          await execAsync(`${pipPath} install -r ${requirementsPath}`, {
-            timeout: 60000, // 60 seconds for pip install
-          });
-        } catch (pipError: any) {
-          console.warn('Some packages failed to install:', pipError.message);
-          // Continue execution even if some packages fail
-        }
+        const pipInstallCmd = useVenv 
+          ? `${pipCommand} install -r ${requirementsPath}`
+          : `${pipCommand} install --user -r ${requirementsPath}`;
+          
+        const { stdout: pipStdout, stderr: pipStderr } = await execAsync(pipInstallCmd, {
+          timeout: timeout * 1000,
+        });
+        
+        console.log('Pip install output:', pipStdout);
+        if (pipStderr) console.error('Pip install errors:', pipStderr);
       }
       
       // Execute the Python script
       const { stdout, stderr } = await execAsync(
-        `${pythonPath} ${scriptPath}`,
+        `${pythonCommand} ${scriptPath}`,
         {
           timeout: (timeout || 30) * 1000,
           maxBuffer: 10 * 1024 * 1024, // 10MB buffer
