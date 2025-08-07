@@ -1,6 +1,6 @@
 {
   "name": "@badc0d3/piece-python-runner",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "Run Python code with imports in Activepieces",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
