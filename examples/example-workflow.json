@@ -1,0 +1,47 @@
+{
+  "name": "Python Data Processing Example",
+  "description": "Example workflow showing how to use the Python Code Runner",
+  "version": "1",
+  "trigger": {
+    "type": "schedule",
+    "settings": {
+      "cronExpression": "0 9 * * *",
+      "timezone": "UTC"
+    }
+  },
+  "actions": [
+    {
+      "name": "Fetch Data",
+      "type": "@activepieces/piece-python-runner.run-python-code",
+      "settings": {
+        "code": "import json\nimport random\nfrom datetime import datetime, timedelta\n\n# Generate sample sales data\nsales_data = []\nfor i in range(10):\n    sale = {\n        'id': i + 1,\n        'date': (datetime.now() - timedelta(days=i)).strftime('%Y-%m-%d'),\n        'product': random.choice(['Product A', 'Product B', 'Product C']),\n        'quantity': random.randint(1, 20),\n        'price': round(random.uniform(10.0, 100.0), 2)\n    }\n    sales_data.append(sale)\n\nprint(json.dumps({'sales': sales_data}))",
+        "requirements": "",
+        "timeout": 30,
+        "pythonVersion": "python3",
+        "captureOutput": true
+      }
+    },
+    {
+      "name": "Process Data",
+      "type": "@activepieces/piece-python-runner.run-python-code",
+      "settings": {
+        "code": "import json\nimport pandas as pd\nfrom datetime import datetime\n\n# Get data from previous step\ndata = {{step.Fetch_Data.output}}\nsales = data['sales']\n\n# Convert to DataFrame\ndf = pd.DataFrame(sales)\ndf['total'] = df['quantity'] * df['price']\ndf['date'] = pd.to_datetime(df['date'])\n\n# Calculate statistics\nstats = {\n    'total_revenue': float(df['total'].sum()),\n    'average_sale': float(df['total'].mean()),\n    'best_product': df.groupby('product')['total'].sum().idxmax(),\n    'total_quantity': int(df['quantity'].sum()),\n    'date_range': {\n        'start': df['date'].min().strftime('%Y-%m-%d'),\n        'end': df['date'].max().strftime('%Y-%m-%d')\n    },\n    'product_summary': df.groupby('product').agg({\n        'quantity': 'sum',\n        'total': 'sum'\n    }).to_dict()\n}\n\nprint(json.dumps(stats, indent=2))",
+        "requirements": "pandas\nnumpy",
+        "timeout": 30,
+        "pythonVersion": "python3",
+        "captureOutput": true
+      }
+    },
+    {
+      "name": "Generate Report",
+      "type": "@activepieces/piece-python-runner.run-python-code",
+      "settings": {
+        "code": "import json\nfrom datetime import datetime\n\n# Get statistics from previous step\nstats = {{step.Process_Data.output}}\n\n# Generate a formatted report\nreport_lines = [\n    f\"Sales Report Generated on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\",\n    \"=\" * 50,\n    f\"Total Revenue: ${stats['total_revenue']:,.2f}\",\n    f\"Average Sale Value: ${stats['average_sale']:,.2f}\",\n    f\"Best Performing Product: {stats['best_product']}\",\n    f\"Total Units Sold: {stats['total_quantity']}\",\n    f\"Report Period: {stats['date_range']['start']} to {stats['date_range']['end']}\",\n    \"\",\n    \"Product Summary:\",\n    \"-\" * 30\n]\n\nfor product, data in stats['product_summary']['quantity'].items():\n    revenue = stats['product_summary']['total'][product]\n    report_lines.append(f\"{product}: {data} units, ${revenue:,.2f}\")\n\nreport = \"\\n\".join(report_lines)\n\nresult = {\n    'report': report,\n    'generated_at': datetime.now().isoformat(),\n    'success': True\n}\n\nprint(json.dumps(result))",
+        "requirements": "",
+        "timeout": 30,
+        "pythonVersion": "python3",
+        "captureOutput": false
+      }
+    }
+  ]
+} 

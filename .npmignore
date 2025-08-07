@@ -1,0 +1,23 @@
+# Source files
+src/
+tsconfig.json
+
+# Development files
+examples/
+test-local.js
+build.sh
+*.md
+
+# IDE and OS files
+.vscode/
+.idea/
+.DS_Store
+
+# Logs
+*.log
+npm-debug.log*
+
+# Development dependencies
+node_modules/
+.git/
+.gitignore 
