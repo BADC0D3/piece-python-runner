@@ -135,25 +135,49 @@ print(json.dumps(data, indent=2))
       if (requirements && requirements.trim()) {
         writeFileSync(requirementsPath, requirements);
         
-        const pipInstallCmd = useVenv 
-          ? `${pipCommand} install -r ${requirementsPath}`
-          : `${pipCommand} install --user -r ${requirementsPath}`;
+        try {
+          // First check if pip is available
+          const pipCheckCmd = useVenv ? `${pipCommand} --version` : `${pythonVersion} -m pip --version`;
+          await execAsync(pipCheckCmd, { timeout: 5000 }).catch(err => {
+            throw new Error(
+              `pip is not installed. Please ensure pip is available in your Python environment. ` +
+              `For Debian/Ubuntu: apt-get install python3-pip. ` +
+              `For other systems, please install pip for ${pythonVersion}.`
+            );
+          });
           
-        const { stdout: pipStdout, stderr: pipStderr } = await execAsync(pipInstallCmd, {
-          timeout: timeout * 1000,
-        });
-        
-        console.log('Pip install output:', pipStdout);
-        if (pipStderr) console.error('Pip install errors:', pipStderr);
+          const pipInstallCmd = useVenv 
+            ? `${pipCommand} install -r ${requirementsPath}`
+            : `${pipCommand} install --user -r ${requirementsPath}`;
+            
+          const { stdout: pipStdout, stderr: pipStderr } = await execAsync(pipInstallCmd, {
+            timeout: timeout * 1000,
+          });
+          
+          console.log('Pip install output:', pipStdout);
+          if (pipStderr) console.error('Pip install errors:', pipStderr);
+        } catch (pipError: any) {
+          // If pip is not available, provide a helpful error message
+          if (pipError.message.includes('No module named pip') || pipError.message.includes('pip is not installed')) {
+            throw new Error(
+              `Cannot install Python packages: pip is not available. ` +
+              `To use packages, please ensure pip is installed in your environment. ` +
+              `For the sandboxed version, use the "Run Python Code (Sandboxed)" action instead.`
+            );
+          }
+          throw pipError;
+        }
       }
       
       // Execute the Python script
+      const execOptions = {
+        timeout: (timeout || 30) * 1000,
+        maxBuffer: 10 * 1024 * 1024, // 10MB buffer for output
+      };
+      
       const { stdout, stderr } = await execAsync(
         `${pythonCommand} ${scriptPath}`,
-        {
-          timeout: (timeout || 30) * 1000,
-          maxBuffer: 10 * 1024 * 1024, // 10MB buffer
-        }
+        execOptions
       );
       
       // Parse output if it's JSON
