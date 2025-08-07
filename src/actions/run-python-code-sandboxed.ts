@@ -1,10 +1,10 @@
-import { createAction, Property } from '@activepieces/pieces-framework';
+import { createAction, Property, ActionContext } from '@activepieces/pieces-framework';
 import Docker from 'dockerode';
 
 export const runPythonCodeSandboxed = createAction({
   name: 'run-python-code-sandboxed',
   displayName: 'Run Python Code (Sandboxed)',
-  description: 'Execute Python code in a Docker container for enhanced security',
+  description: 'Execute Python code in a Docker container for enhanced security. Requires Docker socket access (mount with -v /var/run/docker.sock:/var/run/docker.sock)',
   props: {
     code: Property.LongText({
       displayName: 'Python Code',
@@ -23,8 +23,8 @@ export const runPythonCodeSandboxed = createAction({
       defaultValue: 30,
     }),
   },
-  async run(context) {
-    const { code, requirements, timeout } = context.propsValue;
+  async run(context: ActionContext) {
+    const { code, requirements, timeout, pythonVersion } = context.propsValue;
     const docker = new Docker();
     
     // Create Dockerfile content

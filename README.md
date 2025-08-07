@@ -248,6 +248,25 @@ For Docker deployments, we **strongly recommend** using the **"Run Python Code (
 - Better isolation and security
 - Consistent environment across all executions
 
+**Important**: To use the sandboxed version in Docker, you must mount the Docker socket:
+
+```yaml
+# docker-compose.yml example
+services:
+  activepieces:
+    image: activepieces/activepieces
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock  # Required for sandboxed Python runner
+    # ... other configuration
+```
+
+Or with Docker run:
+```bash
+docker run -v /var/run/docker.sock:/var/run/docker.sock activepieces/activepieces
+```
+
+**Security Note**: Mounting the Docker socket gives the container access to Docker. Only do this in trusted environments.
+
 ### Minimal Docker Image
 
 If you're using a minimal Docker image without pip:
@@ -269,12 +288,23 @@ If you're using a minimal Docker image without pip:
    - Optimize your code for better performance
    - Consider breaking into smaller steps
 
-3. **Memory Error**: Out of memory
-   - Use the sandboxed version with memory limits
-   - Process data in chunks
-   - Clear large variables when done
+3. **"connect ENOENT /var/run/docker.sock"** (Sandboxed version)
+   - This means Docker socket is not accessible
+   - If running Activepieces in Docker, mount the socket: `-v /var/run/docker.sock:/var/run/docker.sock`
+   - Alternatively, use the standard (non-sandboxed) version
+   - Ensure Docker is installed and running on the host
 
-4. **JSON Parse Error**: Output is not valid JSON
+4. **"No module named pip"** (Standard version)
+   - Install pip in your environment: `apt-get install python3-pip`
+   - Or use the sandboxed version which includes pip
+   - Or use only Python standard library (no external packages)
+
+5. **Virtual environment creation fails**
+   - The piece automatically detects Docker and skips venv creation
+   - In minimal containers, use the sandboxed version instead
+   - Or ensure python3-venv is installed: `apt-get install python3-venv`
+
+6. **JSON Parse Error**: Output is not valid JSON
    - Ensure you're using `json.dumps()` for output
    - Check for print statements that might interfere
 
