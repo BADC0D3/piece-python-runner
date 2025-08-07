@@ -217,6 +217,45 @@ On error:
 5. **Clean up resources**: The piece automatically cleans up, but close files/connections in your code
 6. **Use specific package versions**: Pin versions in requirements for reproducibility
 
+## Docker Deployment
+
+### Running in Docker
+
+When deploying Activepieces in Docker, the Python Code Runner adapts to the container environment:
+
+1. **Automatic Detection**: The piece detects Docker environments and skips virtual environment creation
+2. **System Python**: Uses the container's Python installation directly
+3. **Package Installation**: Installs packages with `--user` flag when pip is available
+
+### Docker Setup Requirements
+
+For the **standard Python Code Runner** to work in Docker, ensure your container has:
+
+```dockerfile
+# Example Dockerfile additions
+RUN apt-get update && apt-get install -y \
+    python3 \
+    python3-pip \
+    && rm -rf /var/lib/apt/lists/*
+```
+
+### Recommended: Use Sandboxed Version
+
+For Docker deployments, we **strongly recommend** using the **"Run Python Code (Sandboxed)"** action instead because:
+
+- It runs Python in a separate container with all dependencies pre-installed
+- No need to modify your Activepieces Docker image
+- Better isolation and security
+- Consistent environment across all executions
+
+### Minimal Docker Image
+
+If you're using a minimal Docker image without pip:
+
+1. **Option 1**: Install pip in your Dockerfile (shown above)
+2. **Option 2**: Use the sandboxed version
+3. **Option 3**: Only use Python standard library (no external packages)
+
 ## Troubleshooting
 
 ### Common Issues

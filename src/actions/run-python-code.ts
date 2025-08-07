@@ -1,6 +1,6 @@
 import { createAction, Property, ActionContext } from '@activepieces/pieces-framework';
 import { exec } from 'child_process';
-import { writeFileSync, unlinkSync, mkdirSync, rmdirSync } from 'fs';
+import { writeFileSync, unlinkSync, mkdirSync, rmdirSync, existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { randomBytes } from 'crypto';
 import { promisify } from 'util';
@@ -70,6 +70,16 @@ print(json.dumps(data, indent=2))
     let pipCommand = '';
     let pythonCommand = '';
     
+    // Check if running in Docker
+    const isDocker = process.env.DOCKER_CONTAINER === 'true' || 
+                     existsSync('/.dockerenv') || 
+                     (existsSync('/proc/1/cgroup') && readFileSync('/proc/1/cgroup', 'utf8').includes('docker'));
+    
+    if (isDocker) {
+      console.log('Detected Docker environment - skipping virtual environment creation');
+      useVenv = false;
+    }
+    
     try {
       // Create temporary directory
       mkdirSync(tempDir, { recursive: true });
@@ -77,39 +87,41 @@ print(json.dumps(data, indent=2))
       // Write the Python script
       writeFileSync(scriptPath, code);
       
-      // Create virtual environment
-      try {
-        // First check if Python is available and get version info
-        const pythonCheck = await execAsync(`${pythonVersion} --version`, {
-          timeout: 5000,
-        });
-        console.log(`Python version check: ${pythonCheck.stdout}`);
-        
-        // Check if venv module is available
-        const venvCheck = await execAsync(`${pythonVersion} -m venv --help`, {
-          timeout: 5000,
-        }).catch(err => {
-          throw new Error(`Python venv module not available. Please ensure python3-venv is installed. Error: ${err.message}`);
-        });
-        
-        // Try creating venv with symlinks first
-        await execAsync(`${pythonVersion} -m venv ${venvPath}`, {
-          timeout: 10000,
-        });
-      } catch (error: any) {
-        console.log('Primary venv creation failed:', error.message);
-        
-        // If symlink fails, try without symlinks
+      // Create virtual environment only if not in Docker and useVenv is true
+      if (useVenv) {
         try {
-          console.log('Trying venv creation with --copies flag...');
-          await execAsync(`${pythonVersion} -m venv --copies ${venvPath}`, {
+          // First check if Python is available and get version info
+          const pythonCheck = await execAsync(`${pythonVersion} --version`, {
+            timeout: 5000,
+          });
+          console.log(`Python version check: ${pythonCheck.stdout}`);
+          
+          // Check if venv module is available
+          const venvCheck = await execAsync(`${pythonVersion} -m venv --help`, {
+            timeout: 5000,
+          }).catch(err => {
+            throw new Error(`Python venv module not available. Please ensure python3-venv is installed. Error: ${err.message}`);
+          });
+          
+          // Try creating venv with symlinks first
+          await execAsync(`${pythonVersion} -m venv ${venvPath}`, {
             timeout: 10000,
           });
-        } catch (fallbackError: any) {
-          // If both methods fail, try using the system Python directly
-          console.log('Venv creation failed. Error details:', fallbackError.message);
-          console.log('Falling back to system Python without virtual environment...');
-          useVenv = false;
+        } catch (error: any) {
+          console.log('Primary venv creation failed:', error.message);
+          
+          // If symlink fails, try without symlinks
+          try {
+            console.log('Trying venv creation with --copies flag...');
+            await execAsync(`${pythonVersion} -m venv --copies ${venvPath}`, {
+              timeout: 10000,
+            });
+          } catch (fallbackError: any) {
+            // If both methods fail, try using the system Python directly
+            console.log('Venv creation failed. Error details:', fallbackError.message);
+            console.log('Falling back to system Python without virtual environment...');
+            useVenv = false;
+          }
         }
       }
       
