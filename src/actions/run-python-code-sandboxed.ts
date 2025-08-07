@@ -27,7 +27,7 @@ export const runPythonCodeSandboxed = createAction({
     const { code, requirements, timeout, pythonVersion } = context.propsValue;
     const docker = new Docker();
     
-    const imageName = 'python:3.11-slim';
+    const imageName = 'python:slim';
     
     try {
       // Check if image exists locally
@@ -66,6 +66,9 @@ export const runPythonCodeSandboxed = createAction({
         // If requirements are specified, install them silently first then run the code
         const requirementsList = requirements.trim().split('\n').filter((r: string) => r.trim()).join(' ');
         
+        // Base64 encode the code to avoid shell escaping issues
+        const encodedCode = Buffer.from(code).toString('base64');
+        
         // Create a script that sets up a non-root user and runs the code
         const setupScript = `
 # Create a non-root user (Debian/Ubuntu syntax)
@@ -74,23 +77,25 @@ useradd -m -d /home/pyuser -s /bin/bash pyuser 2>/dev/null || true
 # Switch to non-root user and run the Python code
 su - pyuser -c "
 cd /home/pyuser
-export PATH=/home/pyuser/.local/bin:$PATH
+export PATH=/home/pyuser/.local/bin:\$PATH
 python3 -m pip install --user --quiet --no-cache-dir ${requirementsList} 2>/dev/null
-python3 -c '${code.replace(/'/g, "\\'").replace(/\$/g, "\\$")}'
+echo '${encodedCode}' | base64 -d | python3
 "
 `;
         
         cmd = ['sh', '-c', setupScript];
       } else {
         // No requirements, create user and run the code
+        const encodedCode = Buffer.from(code).toString('base64');
+        
         const setupScript = `
 # Create a non-root user (Debian/Ubuntu syntax)
 useradd -m -d /home/pyuser -s /bin/bash pyuser 2>/dev/null || true
 
 # Switch to non-root user and run the Python code
 su - pyuser -c "
-export PATH=/home/pyuser/.local/bin:$PATH
-python3 -c '${code.replace(/'/g, "\\'").replace(/\$/g, "\\$")}'
+export PATH=/home/pyuser/.local/bin:\$PATH
+echo '${encodedCode}' | base64 -d | python3
 "
 `;
         

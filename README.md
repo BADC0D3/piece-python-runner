@@ -248,7 +248,7 @@ For Docker deployments, we **strongly recommend** using the **"Run Python Code (
 - No need to modify your Activepieces Docker image
 - Better isolation and security
 - Consistent environment across all executions
-- Automatically pulls the python:3.11-slim image if not present
+- Automatically pulls the python:slim image if not present
 
 **Important**: To use the sandboxed version in Docker, you must mount the Docker socket:
 
