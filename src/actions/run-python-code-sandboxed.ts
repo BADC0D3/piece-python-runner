@@ -10,11 +10,20 @@ export const runPythonCodeSandboxed = createAction({
       displayName: 'Python Code',
       description: 'The Python code to execute',
       required: true,
+      defaultValue: `# Example with external package
+import requests
+import json
+
+# Get external IP
+response = requests.get('https://api.ipify.org?format=json')
+data = response.json()
+print(json.dumps(data, indent=2))`,
     }),
     requirements: Property.LongText({
       displayName: 'Requirements',
       description: 'Python packages to install (one per line)',
       required: false,
+      defaultValue: 'requests',
     }),
     timeout: Property.Number({
       displayName: 'Timeout (seconds)',

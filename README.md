@@ -4,13 +4,20 @@ A powerful Activepieces piece that allows you to execute Python code with suppor
 
 ## Features
 
-- **Execute Python Code**: Run any Python code within your Activepieces workflows
-- **Library Support**: Install and use any Python package from PyPI
-- **Multiple Python Versions**: Support for Python 3.9, 3.10, 3.11
-- **Virtual Environment**: Each execution runs in an isolated virtual environment
-- **JSON Output Support**: Automatically parse JSON output from your Python scripts
-- **Sandboxed Execution**: Optional Docker-based execution for enhanced security
-- **Error Handling**: Comprehensive error reporting with stdout/stderr capture
+- 🐍 **Execute Python Code**: Run Python scripts directly in your workflows
+- 📦 **Package Management**: Install and use any Python package from PyPI
+- 🔒 **Two Execution Modes**:
+  - Standard: Fast execution with virtual environments
+  - Sandboxed: Secure Docker-based execution with resource limits
+- ⚡ **Fast Execution**: Reuse Python environment when possible
+- 🎯 **Error Handling**: Clear error messages and stack traces
+- 📊 **JSON Output**: Easy integration with other workflow steps
+
+### UI Note
+Currently, Activepieces uses a multi-line text box for code input. While it doesn't have syntax highlighting like a full code editor, you can:
+- Write your code in your favorite editor and paste it
+- Use proper indentation (the text box preserves formatting)
+- Test your code locally first, then paste into Activepieces
 
 ## Installation
 

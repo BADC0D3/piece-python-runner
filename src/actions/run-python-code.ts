@@ -10,19 +10,19 @@ const execAsync = promisify(exec);
 export const runPythonCode = createAction({
   name: 'run-python-code',
   displayName: 'Run Python Code',
-  description: 'Execute Python code with imports and return the output',
+  description: 'Execute Python code with optional package installation',
   props: {
     code: Property.LongText({
       displayName: 'Python Code',
       description: 'The Python code to execute',
       required: true,
-      defaultValue: `import json
-import requests
+      defaultValue: `# Example: Get external IP address
+import urllib.request
+import json
 
-# Your Python code here
-data = {"message": "Hello from Python!"}
-print(json.dumps(data, indent=2))
-`,
+response = urllib.request.urlopen('https://api.ipify.org?format=json')
+data = json.loads(response.read())
+print(f"Your IP: {data['ip']}")`,
     }),
     requirements: Property.LongText({
       displayName: 'Requirements',
