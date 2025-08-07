@@ -74,11 +74,17 @@ export const runPythonCodeSandboxed = createAction({
 # Create a non-root user (Debian/Ubuntu syntax)
 useradd -m -d /home/pyuser -s /bin/bash pyuser 2>/dev/null || true
 
+# First ensure pip is installed
+python3 -m ensurepip --upgrade 2>/dev/null || python3 -m pip --version || apt-get update && apt-get install -y python3-pip
+
+# Install packages as root to ensure they're available
+python3 -m pip install --no-cache-dir ${requirementsList}
+
 # Switch to non-root user and run the Python code
 su - pyuser -c "
 cd /home/pyuser
-export PATH=/home/pyuser/.local/bin:\$PATH
-python3 -m pip install --user --quiet --no-cache-dir ${requirementsList} 2>/dev/null
+export PATH=/usr/local/bin:/usr/bin:/bin:/home/pyuser/.local/bin:\$PATH
+export PYTHONPATH=/usr/local/lib/python3.12/site-packages:/usr/local/lib/python3.11/site-packages:/usr/local/lib/python3.10/site-packages:\$PYTHONPATH
 echo '${encodedCode}' | base64 -d | python3
 "
 `;
@@ -94,7 +100,7 @@ useradd -m -d /home/pyuser -s /bin/bash pyuser 2>/dev/null || true
 
 # Switch to non-root user and run the Python code
 su - pyuser -c "
-export PATH=/home/pyuser/.local/bin:\$PATH
+export PATH=/usr/local/bin:/usr/bin:/bin:/home/pyuser/.local/bin:\$PATH
 echo '${encodedCode}' | base64 -d | python3
 "
 `;
