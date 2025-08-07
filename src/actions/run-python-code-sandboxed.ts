@@ -68,14 +68,13 @@ export const runPythonCodeSandboxed = createAction({
         
         // Create a script that sets up a non-root user and runs the code
         const setupScript = `
-# Create a non-root user
-adduser -D -h /home/pyuser pyuser 2>/dev/null || true
-mkdir -p /home/pyuser
-chown -R pyuser:pyuser /home/pyuser
+# Create a non-root user (Debian/Ubuntu syntax)
+useradd -m -d /home/pyuser -s /bin/bash pyuser 2>/dev/null || true
 
 # Switch to non-root user and run the Python code
 su - pyuser -c "
 cd /home/pyuser
+export PATH=/home/pyuser/.local/bin:$PATH
 python3 -m pip install --user --quiet --no-cache-dir ${requirementsList} 2>/dev/null
 python3 -c '${code.replace(/'/g, "\\'").replace(/\$/g, "\\$")}'
 "
@@ -85,13 +84,14 @@ python3 -c '${code.replace(/'/g, "\\'").replace(/\$/g, "\\$")}'
       } else {
         // No requirements, create user and run the code
         const setupScript = `
-# Create a non-root user
-adduser -D -h /home/pyuser pyuser 2>/dev/null || true
-mkdir -p /home/pyuser
-chown -R pyuser:pyuser /home/pyuser
+# Create a non-root user (Debian/Ubuntu syntax)
+useradd -m -d /home/pyuser -s /bin/bash pyuser 2>/dev/null || true
 
 # Switch to non-root user and run the Python code
-su - pyuser -c "python3 -c '${code.replace(/'/g, "\\'").replace(/\$/g, "\\$")}'"
+su - pyuser -c "
+export PATH=/home/pyuser/.local/bin:$PATH
+python3 -c '${code.replace(/'/g, "\\'").replace(/\$/g, "\\$")}'
+"
 `;
         
         cmd = ['sh', '-c', setupScript];
