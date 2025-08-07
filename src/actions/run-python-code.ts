@@ -1,4 +1,4 @@
-import { createAction, Property } from '@activepieces/pieces-framework';
+import { createAction, Property, ActionContext } from '@activepieces/pieces-framework';
 import { exec } from 'child_process';
 import { writeFileSync, unlinkSync, mkdirSync, rmdirSync } from 'fs';
 import { join } from 'path';
@@ -57,7 +57,7 @@ print(json.dumps(data, indent=2))
       defaultValue: true,
     }),
   },
-  async run(context) {
+  async run(context: ActionContext) {
     const { code, requirements, timeout, pythonVersion, captureOutput } = context.propsValue;
     
     // Create a temporary directory for this execution
@@ -74,9 +74,18 @@ print(json.dumps(data, indent=2))
       writeFileSync(scriptPath, code);
       
       // Create virtual environment
-      await execAsync(`${pythonVersion} -m venv ${venvPath}`, {
-        timeout: 10000,
-      });
+      try {
+        // Try creating venv with symlinks first
+        await execAsync(`${pythonVersion} -m venv ${venvPath}`, {
+          timeout: 10000,
+        });
+      } catch (error: any) {
+        // If symlink fails, try without symlinks
+        console.log('Venv creation with symlinks failed, trying with copies...');
+        await execAsync(`${pythonVersion} -m venv --copies ${venvPath}`, {
+          timeout: 10000,
+        });
+      }
       
       // Determine pip path based on OS
       const pipPath = process.platform === 'win32' 
