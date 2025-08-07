@@ -27,20 +27,56 @@ export const runPythonCodeSandboxed = createAction({
     const { code, requirements, timeout, pythonVersion } = context.propsValue;
     const docker = new Docker();
     
-    // Create Dockerfile content
-    const dockerfileContent = `
-FROM python:3.11-slim
-WORKDIR /app
-${requirements ? `RUN pip install --no-cache-dir ${requirements.split('\n').join(' ')}` : ''}
-COPY script.py .
-CMD ["python", "script.py"]
-`;
+    const imageName = 'python:3.11-slim';
     
     try {
+      // Check if image exists locally
+      console.log(`Checking for Docker image ${imageName}...`);
+      try {
+        await docker.getImage(imageName).inspect();
+        console.log(`Image ${imageName} found locally`);
+      } catch (error) {
+        // Image doesn't exist locally, pull it
+        console.log(`Image ${imageName} not found locally, pulling...`);
+        
+        const stream = await docker.pull(imageName);
+        
+        // Wait for pull to complete and show progress
+        await new Promise((resolve, reject) => {
+          docker.modem.followProgress(stream, (err: any, res: any) => {
+            if (err) {
+              reject(err);
+            } else {
+              console.log(`Successfully pulled ${imageName}`);
+              resolve(res);
+            }
+          }, (event: any) => {
+            // Log pull progress
+            if (event.status) {
+              console.log(`${event.status}${event.progress ? ': ' + event.progress : ''}`);
+            }
+          });
+        });
+      }
+      
       // Create container with the code
+      let cmd: string[];
+      
+      if (requirements && requirements.trim()) {
+        // If requirements are specified, install them first then run the code
+        const requirementsList = requirements.trim().split('\n').filter((r: string) => r.trim()).join(' ');
+        cmd = [
+          'sh', '-c',
+          `pip install --no-cache-dir ${requirementsList} && python -c "${code.replace(/"/g, '\\"')}"`
+        ];
+      } else {
+        // No requirements, just run the code
+        cmd = ['python', '-c', code];
+      }
+      
       const container = await docker.createContainer({
-        Image: 'python:3.11-slim',
-        Cmd: ['python', '-c', code],
+        Image: imageName,
+        Cmd: cmd,
         WorkingDir: '/app',
         HostConfig: {
           AutoRemove: true,
@@ -68,13 +104,22 @@ CMD ["python", "script.py"]
         }
       });
       
-      // Wait for container to finish or timeout
-      await Promise.race([
-        container.wait(),
-        new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Execution timeout')), (timeout || 30) * 1000)
-        ),
-      ]);
+      // Set a timeout for container execution
+      const executionTimeout = (timeout || 30) * 1000;
+      const timeoutHandle = setTimeout(async () => {
+        try {
+          await container.kill();
+        } catch (e) {
+          // Container might have already stopped
+        }
+      }, executionTimeout);
+      
+      // Wait for container to finish
+      try {
+        await container.wait();
+      } finally {
+        clearTimeout(timeoutHandle);
+      }
       
       // Parse output
       let parsedOutput;
@@ -93,11 +138,20 @@ CMD ["python", "script.py"]
       };
       
     } catch (error: any) {
-      return {
-        success: false,
-        error: error.message,
-        executionTime: new Date().toISOString(),
-      };
+      console.error('Docker execution error:', error);
+      
+      // Provide more specific error messages
+      if (error.message?.includes('connect ENOENT')) {
+        throw new Error(
+          'Docker socket not found. Please ensure Docker is running and the socket is mounted with -v /var/run/docker.sock:/var/run/docker.sock'
+        );
+      } else if (error.statusCode === 404) {
+        throw new Error(
+          `Docker image ${imageName} not found and could not be pulled. Please check your internet connection.`
+        );
+      } else {
+        throw error;
+      }
     }
   },
 }); 
