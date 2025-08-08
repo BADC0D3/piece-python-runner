@@ -31,12 +31,18 @@ print(json.dumps(data, indent=2))`,
       required: false,
       defaultValue: 30,
     }),
+    dockerImage: Property.ShortText({
+      displayName: 'Docker Image',
+      description: 'Docker image to use for running Python code (e.g., python:3.11-slim, python:3.9-alpine)',
+      required: false,
+      defaultValue: 'python:slim',
+    }),
   },
   async run(context: ActionContext) {
-    const { code, requirements, timeout, pythonVersion } = context.propsValue;
+    const { code, requirements, timeout, dockerImage } = context.propsValue;
     const docker = new Docker();
     
-    const imageName = 'python:slim';
+    const imageName = dockerImage || 'python:slim';
     
     try {
       // Check if image exists locally
